@@ -1,169 +1,300 @@
-import React from 'react';
+'use client';
 
-// 仮のデータ
-const monthlyConsumptionData = [
-  { month: '1月', rice: 50, flour: 30, soy: 15, tea: 25 },
-  { month: '2月', rice: 45, flour: 28, soy: 18, tea: 22 },
-  { month: '3月', rice: 55, flour: 35, soy: 20, tea: 30 },
-  { month: '4月', rice: 60, flour: 40, soy: 22, tea: 35 },
-  { month: '5月', rice: 48, flour: 32, soy: 16, tea: 28 },
-];
-
-const topItemsData = [
-  { name: '米', consumption: 258, percentage: 30 },
-  { name: '小麦粉', consumption: 165, percentage: 19 },
-  { name: 'お茶', consumption: 140, percentage: 16 },
-  { name: '醤油', consumption: 91, percentage: 11 },
-  { name: '味噌', consumption: 75, percentage: 9 },
-];
+import React, { useState, useEffect, useMemo } from 'react';
+import { InventoryItem } from '@/types/inventory';
+import { inventoryItems as mockItems } from '@/data/mockData';
+import { isExpired, isNearExpiration } from '@/utils/dateUtils';
 
 export default function ReportsPage() {
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  
+  // 初期データのロード
+  useEffect(() => {
+    setInventoryItems(mockItems);
+  }, []);
+  
+  // 統計データの計算
+  const stats = useMemo(() => {
+    // カテゴリー別アイテム数
+    const categoryCount: Record<string, number> = {};
+    
+    // カテゴリー別在庫数
+    const categoryQuantity: Record<string, number> = {};
+    
+    // 期限切れアイテム数
+    let expiredCount = 0;
+    
+    // 期限間近アイテム数
+    let nearExpirationCount = 0;
+    
+    // 在庫少アイテム数（仮の閾値として10を使用）
+    let lowStockCount = 0;
+    
+    inventoryItems.forEach(item => {
+      // カテゴリー別集計
+      if (!categoryCount[item.category]) {
+        categoryCount[item.category] = 0;
+      }
+      categoryCount[item.category]++;
+      
+      if (!categoryQuantity[item.category]) {
+        categoryQuantity[item.category] = 0;
+      }
+      categoryQuantity[item.category] += item.quantity;
+      
+      // 期限切れチェック
+      if (isExpired(item.expirationDate)) {
+        expiredCount++;
+      }
+      
+      // 期限間近チェック
+      if (isNearExpiration(item.expirationDate)) {
+        nearExpirationCount++;
+      }
+      
+      // 在庫少チェック
+      if (item.quantity <= 10) {
+        lowStockCount++;
+      }
+    });
+    
+    return {
+      totalItems: inventoryItems.length,
+      categoryCount,
+      categoryQuantity,
+      expiredCount,
+      nearExpirationCount,
+      lowStockCount,
+    };
+  }, [inventoryItems]);
+  
+  // カテゴリー別の色
+  const categoryColors: Record<string, string> = {
+    '蔵時記菓子': 'bg-red-200',
+    '抹茶': 'bg-green-200',
+    'せんべい': 'bg-yellow-200',
+    'もち': 'bg-purple-200',
+    '一口': 'bg-blue-200',
+    '駄菓子': 'bg-pink-200',
+    'アイス': 'bg-cyan-200',
+    'ジュース': 'bg-orange-200',
+    '茶': 'bg-lime-200',
+  };
+  
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">分析レポート</h1>
-        <div className="flex space-x-2">
-          <button className="btn-secondary">
-            CSVエクスポート
-          </button>
-          <button className="btn-primary">
-            レポート生成
-          </button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">在庫レポート</h1>
+        <p className="text-gray-600">在庫状況の概要と統計情報</p>
       </div>
-
-      {/* レポート期間選択 */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="reportType" className="block text-sm font-medium text-gray-700 mb-1">レポートタイプ</label>
-            <select
-              id="reportType"
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            >
-              <option value="monthly">月次消費量</option>
-              <option value="category">カテゴリー別分析</option>
-              <option value="forecast">在庫予測</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="dateFrom" className="block text-sm font-medium text-gray-700 mb-1">期間（から）</label>
-            <input
-              type="date"
-              id="dateFrom"
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label htmlFor="dateTo" className="block text-sm font-medium text-gray-700 mb-1">期間（まで）</label>
-            <input
-              type="date"
-              id="dateTo"
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* レポートグリッド */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* 月次消費量グラフ */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-4">月次消費量推移</h2>
-          <div className="h-64 flex items-end justify-between">
-            {monthlyConsumptionData.map((data) => (
-              <div key={data.month} className="flex flex-col items-center w-1/6">
-                <div className="flex flex-col-reverse w-full">
-                  <div 
-                    className="bg-blue-500 w-full" 
-                    style={{ height: `${data.rice / 2}px` }}
-                    title={`米: ${data.rice}kg`}
-                  ></div>
-                  <div 
-                    className="bg-yellow-500 w-full" 
-                    style={{ height: `${data.flour / 2}px` }}
-                    title={`小麦粉: ${data.flour}kg`}
-                  ></div>
-                  <div 
-                    className="bg-green-500 w-full" 
-                    style={{ height: `${data.soy / 2}px` }}
-                    title={`醤油: ${data.soy}L`}
-                  ></div>
-                  <div 
-                    className="bg-red-500 w-full" 
-                    style={{ height: `${data.tea / 2}px` }}
-                    title={`お茶: ${data.tea}箱`}
-                  ></div>
-                </div>
-                <span className="mt-2 text-sm">{data.month}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-center mt-4">
-            <div className="flex space-x-4">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-blue-500 mr-1"></div>
-                <span className="text-xs">米</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-yellow-500 mr-1"></div>
-                <span className="text-xs">小麦粉</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-500 mr-1"></div>
-                <span className="text-xs">醤油</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-red-500 mr-1"></div>
-                <span className="text-xs">お茶</span>
-              </div>
+      
+      {/* 概要カード */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <h2 className="text-gray-600 text-sm">総アイテム数</h2>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalItems}</p>
             </div>
           </div>
         </div>
-
-        {/* 消費量トップ5 */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-4">消費量トップ5</h2>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-red-100 text-red-600">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <h2 className="text-gray-600 text-sm">期限切れアイテム</h2>
+              <p className="text-2xl font-bold text-gray-900">{stats.expiredCount}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-yellow-100 text-yellow-600">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <h2 className="text-gray-600 text-sm">期限間近アイテム</h2>
+              <p className="text-2xl font-bold text-gray-900">{stats.nearExpirationCount}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-orange-100 text-orange-600">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <h2 className="text-gray-600 text-sm">在庫少アイテム</h2>
+              <p className="text-2xl font-bold text-gray-900">{stats.lowStockCount}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* カテゴリー別統計 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">カテゴリー別アイテム数</h2>
           <div className="space-y-4">
-            {topItemsData.map((item) => (
-              <div key={item.name}>
+            {Object.entries(stats.categoryCount).map(([category, count]) => (
+              <div key={category}>
                 <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium">{item.name}</span>
-                  <span className="text-sm text-gray-500">{item.consumption} 単位 ({item.percentage}%)</span>
+                  <span className="text-sm font-medium text-gray-700">{category}</span>
+                  <span className="text-sm font-medium text-gray-700">{count}個</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2.5">
                   <div 
-                    className="bg-blue-600 h-2.5 rounded-full" 
-                    style={{ width: `${item.percentage}%` }}
+                    className={`h-2.5 rounded-full ${categoryColors[category] || 'bg-gray-500'}`} 
+                    style={{ width: `${(count / stats.totalItems) * 100}%` }}
                   ></div>
                 </div>
               </div>
             ))}
           </div>
         </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">カテゴリー別在庫数</h2>
+          <div className="space-y-4">
+            {Object.entries(stats.categoryQuantity).map(([category, quantity]) => {
+              // 総在庫数を計算
+              const totalQuantity = Object.values(stats.categoryQuantity).reduce((sum, qty) => sum + qty, 0);
+              
+              return (
+                <div key={category}>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm font-medium text-gray-700">{category}</span>
+                    <span className="text-sm font-medium text-gray-700">{quantity}個</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className={`h-2.5 rounded-full ${categoryColors[category] || 'bg-gray-500'}`} 
+                      style={{ width: `${(quantity / totalQuantity) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
-
-      {/* 消費傾向分析 */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <h2 className="text-lg font-semibold mb-4">消費傾向分析</h2>
-        <div className="prose max-w-none">
-          <p>
-            過去5ヶ月間のデータに基づく分析結果:
-          </p>
-          <ul>
-            <li>米の消費量は平均して月48kgで、4月に最大消費量(60kg)を記録しました。</li>
-            <li>小麦粉の消費量は徐々に増加傾向にあり、前年同期比で15%増加しています。</li>
-            <li>醤油の消費量は比較的安定していますが、3月と4月に若干の増加が見られました。</li>
-            <li>お茶の消費量は季節変動があり、暖かい月に増加する傾向があります。</li>
-          </ul>
-          <p>
-            推奨事項:
-          </p>
-          <ul>
-            <li>米の発注量を6月に向けて10%増やすことを検討してください。</li>
-            <li>小麦粉の在庫を現在のレベルで維持し、消費傾向を継続的に監視してください。</li>
-            <li>醤油の発注サイクルを現在の月1回から隔月に変更することで、発注コストを削減できる可能性があります。</li>
-          </ul>
+      
+      {/* 期限切れ・在庫少アイテムリスト */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">期限切れ・期限間近アイテム</h2>
+          {inventoryItems.filter(item => isExpired(item.expirationDate) || isNearExpiration(item.expirationDate)).length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      名称
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      カテゴリー
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      賞味期限
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      状態
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {inventoryItems
+                    .filter(item => isExpired(item.expirationDate) || isNearExpiration(item.expirationDate))
+                    .map(item => (
+                      <tr key={item.id}>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {item.name}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                          {item.category}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                          {item.expirationDate}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm">
+                          {isExpired(item.expirationDate) ? (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                              期限切れ
+                            </span>
+                          ) : (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                              期限間近
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-gray-500">期限切れ・期限間近のアイテムはありません。</p>
+          )}
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">在庫少アイテム</h2>
+          {inventoryItems.filter(item => item.quantity <= 10).length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      名称
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      カテゴリー
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      在庫数
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {inventoryItems
+                    .filter(item => item.quantity <= 10)
+                    .map(item => (
+                      <tr key={item.id}>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {item.name}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                          {item.category}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                            {item.quantity} {item.unit}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-gray-500">在庫少のアイテムはありません。</p>
+          )}
         </div>
       </div>
     </div>
