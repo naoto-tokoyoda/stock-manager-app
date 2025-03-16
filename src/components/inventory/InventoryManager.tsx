@@ -5,9 +5,9 @@ import { InventoryItem } from '@/types/inventory';
 import InventoryTable from '@/components/inventory/InventoryTable';
 import InventoryFilter from '@/components/inventory/InventoryFilter';
 import InventoryForm from '@/components/inventory/InventoryForm';
-import { categories } from '@/data/mockData';
 import { isExpired, isNearExpiration } from '@/utils/dateUtils';
 import { useInventoryStore } from '@/state/store/inventoryStore';
+import { useCategoryStore } from '@/state/store/categoryStore';
 
 export default function InventoryManager() {
   // Zustandストアから状態と関数を取得
@@ -17,6 +17,10 @@ export default function InventoryManager() {
   const updateItem = useInventoryStore((state) => state.updateItem);
   const addItem = useInventoryStore((state) => state.addItem);
   const deleteItem = useInventoryStore((state) => state.deleteItem);
+  
+  // カテゴリーストアから状態と関数を取得
+  const categories = useCategoryStore((state) => state.categories);
+  const initializeCategoryStore = useCategoryStore((state) => state.initializeStore);
   
   // モーダル状態
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,7 +33,16 @@ export default function InventoryManager() {
   // 初期データのロード
   useEffect(() => {
     initializeStore();
-  }, [initializeStore]);
+    initializeCategoryStore();
+    
+    // カテゴリーが正しく初期化されているか確認
+    console.log('Categories initialized:', categories);
+  }, [initializeStore, initializeCategoryStore]);
+  
+  // カテゴリーの変更を監視
+  useEffect(() => {
+    console.log('Categories updated:', categories);
+  }, [categories]);
 
   // フィルター適用後のアイテム
   const filteredItems = useMemo(() => {
@@ -106,58 +119,51 @@ export default function InventoryManager() {
     setIsModalOpen(false);
   };
 
-  // CSVエクスポート機能
+  // CSVエクスポート
   const handleExportCSV = () => {
     // CSVヘッダー
     const headers = [
+      'ID',
       'カテゴリー',
       '名称',
       '数量',
       '単位',
-      'パッケージサイズ',
       '入荷日',
       '入荷状況',
       '賞味期限',
-      '予定使用日',
-      'メモ',
+      'パッケージサイズ',
     ].join(',');
 
     // CSVデータ行
-    const csvRows = filteredItems.map((item) => {
-      return [
-        item.category,
-        item.name,
-        item.quantity,
-        item.unit,
-        item.packageSize || '',
-        item.receiveDate || '',
-        item.receiveStatus || '',
-        item.expirationDate || '',
-        item.scheduledUseDate || '',
-        item.notes || '',
-      ]
-        .map((value) => `"${value}"`)
-        .join(',');
-    });
+    const rows = inventoryItems.map((item) => [
+      item.id,
+      item.category,
+      item.name,
+      item.quantity,
+      item.unit,
+      item.receiveDate || '',
+      item.receiveStatus || '',
+      item.expirationDate || '',
+      item.packageSize || '',
+    ].join(','));
 
-    // CSVデータの作成
-    const csvData = [headers, ...csvRows].join('\n');
-    
+    // CSVデータ作成
+    const csvContent = [headers, ...rows].join('\n');
+
     // BOMを追加してUTF-8として認識されるようにする
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvData], { type: 'text/csv;charset=utf-8;' });
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+    const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
     
-    // ダウンロードリンクの作成
-    const url = URL.createObjectURL(blob);
+    // ダウンロードリンク作成
     const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
     link.setAttribute('href', url);
-    link.setAttribute('download', `在庫一覧_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
     document.body.appendChild(link);
-    
-    // ダウンロード実行
     link.click();
-    
-    // クリーンアップ
     document.body.removeChild(link);
   };
 
@@ -208,23 +214,21 @@ export default function InventoryManager() {
       {/* 削除確認ダイアログ */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">削除の確認</h3>
-            <p className="text-sm text-gray-500 mb-6">
-              このアイテムを削除してもよろしいですか？この操作は元に戻せません。
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">アイテムを削除しますか？</h3>
+            <p className="text-gray-500 mb-4">
+              このアイテムを削除すると、関連するすべてのデータが失われます。この操作は元に戻せません。
             </p>
             <div className="flex justify-end space-x-3">
               <button
-                type="button"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 キャンセル
               </button>
               <button
-                type="button"
                 onClick={handleDeleteConfirm}
-                className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 削除
               </button>

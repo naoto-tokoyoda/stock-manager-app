@@ -30,6 +30,12 @@ export default function Home() {
           icon="📊" 
         />
         <DashboardCard 
+          title="カテゴリー管理" 
+          description="在庫アイテムのカテゴリーを管理" 
+          link="/categories" 
+          icon="🏷️" 
+        />
+        <DashboardCard 
           title="設定" 
           description="アプリケーション設定" 
           link="/settings" 
