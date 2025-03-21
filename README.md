@@ -8,6 +8,12 @@
 - **フロントエンド**: Next.js, React.js, Tailwind CSS
 - **デプロイ**: Vercel
 
+## デプロイ環境
+
+- **本番環境**: https://stock-manager-app.vercel.app
+- **ステージング環境**: https://staging-stock-manager-app.vercel.app
+- **開発環境**: https://develop-stock-manager-app.vercel.app
+
 ## 始め方
 
 まず、開発サーバーを起動します:
