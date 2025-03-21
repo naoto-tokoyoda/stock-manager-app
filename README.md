@@ -10,9 +10,9 @@
 
 ## デプロイ環境
 
-- **本番環境**: https://stock-manager-app.vercel.app
-- **ステージング環境**: https://staging-stock-manager-app.vercel.app
-- **開発環境**: https://develop-stock-manager-app.vercel.app
+- **本番環境**: https://stock-manager-app-cyan.vercel.app
+- **ステージング環境**: https://stock-manager-app-git-staging-naoto-tokoyodas-projects.vercel.app
+- **開発環境**: https://stock-manager-app-git-develop-naoto-tokoyodas-projects.vercel.app
 
 ## 始め方
 
